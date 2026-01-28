@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual Environments
+enven/
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Models and Data
+models/*.pkl
+models/*.onnx
+models/*.pt
+models/*.pth
+models/*.h5
+models/*.pb
+temp_arcface_savedmodel/
+
+# Generated Files
+detected_faces/
+*.csv
+*.txt
+attendance.csv
+attendance_list.txt
+detected_faces.csv
+
+# Videos (large files)
+videos/*.mp4
+videos/*.avi
+videos/*.mov
+videos/*.mkv
+videos/*.wmv
+
+# Training Data
+students faces/
+student faces paasport/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak

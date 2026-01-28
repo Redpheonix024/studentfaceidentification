@@ -1,0 +1,132 @@
+# Face Recognition Model Notes
+
+## Recognition Models Used by test_models.py
+
+### Face Detection Model
+- **RetinaFace R50** (`models/retinaface_r50.onnx`)
+  - ONNX format
+  - 640x640 input size
+  - Used to detect faces in video frames
+
+### Face Recognition Model
+- **ArcFace R100** (`models/arcface_r100.onnx`)
+  - ONNX format
+  - 512-dimensional embeddings
+  - Used to recognize detected faces
+
+### Available Embedding Databases (--model argument)
+
+| Model # | Description | File | Embeddings |
+|---------|-------------|------|------------|
+| 1 | Class Photos | face_embeddings_arcface.pkl | 192 (class photos) |
+| 2 | Passport Legacy | face_embeddings_passport.pkl | 7 (passport) |
+| 3 | Merged Legacy | face_embeddings_merged.pkl | 199 (old merge) |
+| 4 | Passport R100 | face_embeddings_passport_r100.pkl | 7 (passport R100) |
+| 5 | Merged R100 ✨ | face_embeddings_merged_r100.pkl | 199 (20 students) DEFAULT |
+
+### GPU Acceleration
+- DirectML (AMD GPU) - automatically detected
+- CUDA (NVIDIA GPU) - if available
+- CPU (fallback)
+
+---
+
+## How to Create Merged R100 Model
+
+### Step-by-Step Process
+
+#### 1. Train Class Photos Model
+```powershell
+python train_class_photos_r100.py
+```
+**Output**: `models/face_embeddings_class_r100.pkl` (192 embeddings, 20 students)
+
+#### 2. Train Passport Photos Model
+```powershell
+python train_passport_insightface.py
+```
+**Output**: `models/face_embeddings_passport_r100.pkl` (7 embeddings)
+
+#### 3. Merge Both Models
+```powershell
+python merge_models_r100.py
+```
+**Output**: `models/face_embeddings_merged_r100.pkl` (199 embeddings)
+
+#### 4. Fix Name Variations (recommended)
+```powershell
+python fix_name_variations.py
+Move-Item -Force models/face_embeddings_merged_r100_fixed.pkl models/face_embeddings_merged_r100.pkl
+```
+
+Standardizes duplicate names:
+- "Gouripriya" + "GOURIPRIYA" → GOURIPRIYA
+- "Krishna S" + "KRISHNA S" → KRISHNA S
+- etc.
+
+### What merge_models_r100.py Does
+
+```python
+# 1. Load passport embeddings
+passport_emb, passport_names = pickle.load(open('models/face_embeddings_passport_r100.pkl', 'rb'))
+
+# 2. Load class embeddings  
+class_emb, class_names = pickle.load(open('models/face_embeddings_class_r100.pkl', 'rb'))
+
+# 3. Combine them
+all_embeddings = passport_emb + class_emb  # 7 + 192 = 199
+all_names = passport_names + class_names
+
+# 4. Save merged model
+pickle.dump((all_embeddings, all_names), open('models/face_embeddings_merged_r100.pkl', 'wb'))
+```
+
+### Quick One-Command Rebuild
+
+```powershell
+# Full rebuild from scratch
+python train_class_photos_r100.py
+python merge_models_r100.py
+python fix_name_variations.py
+Move-Item -Force models/face_embeddings_merged_r100_fixed.pkl models/face_embeddings_merged_r100.pkl
+
+# Test
+python test_models.py --model 5
+```
+
+### Required Files
+
+**Input datasets:**
+- `students faces/` - Class photos (192 photos, 20 students)
+- `student faces paasport/` - Passport photos (7 photos)
+
+**ONNX models:**
+- `models/retinaface_r50.onnx` - Face detection
+- `models/arcface_r100.onnx` - Face recognition (R100 = 512-dim)
+
+**Scripts:**
+- `train_class_photos_r100.py` - Trains on class photos
+- `train_passport_insightface.py` - Trains on passport photos
+- `merge_models_r100.py` - Merges the two
+- `fix_name_variations.py` - Standardizes names
+
+**Final output:**
+- `models/face_embeddings_merged_r100.pkl` - 199 embeddings, 20 unique students
+
+---
+
+## Testing Different Models
+
+```powershell
+# Test with Model 1 (Class photos only)
+python test_models.py --model 1
+
+# Test with Model 5 (Best - Merged R100)
+python test_models.py --model 5
+
+# Adjust confidence threshold
+python test_models.py --model 5 --confidence 0.3
+
+# Multithreaded version (smoother playback)
+python test_models_mt.py --confidence 0.3
+```
