@@ -35,7 +35,6 @@ temp_arcface_savedmodel/
 # Generated Files
 detected_faces/
 *.csv
-*.txt
 attendance.csv
 attendance_list.txt
 detected_faces.csv
@@ -43,6 +42,7 @@ detected_faces.csv
 # Videos (large files)
 videos/*.mp4
 videos/*.avi
+
 videos/*.mov
 videos/*.mkv
 videos/*.wmv

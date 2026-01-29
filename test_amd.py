@@ -9,35 +9,41 @@ import pickle
 import faiss
 import argparse
 
+# Import cross-platform utilities
+try:
+    import gpu_utils
+    import config
+except ImportError as e:
+    print(f"❌ Error importing utilities: {e}")
+    print("   Make sure gpu_utils.py and config.py are in the project directory.")
+    sys.exit(1)
+
 # =========================
 # ONNX / GPU SETUP
 # =========================
 try:
     import onnxruntime as ort
-    providers = ort.get_available_providers()
-    if 'DmlExecutionProvider' in providers:
-        print("✅ Using DirectML (AMD GPU)")
-        PROVIDERS = ['DmlExecutionProvider']
-    else:
-        print("⚠️ DirectML not found. Falling back to CPU.")
-        PROVIDERS = ['CPUExecutionProvider']
+    # Use cross-platform GPU detection
+    PROVIDERS = gpu_utils.get_onnx_providers()
 except ImportError:
-    print("❌ onnxruntime not found.")
-    PROVIDERS = ['CPUExecutionProvider']
-    ort = None
+    print("❌ onnxruntime not found. Install with: pip install onnxruntime")
+    print("   For GPU support:")
+    print("   - NVIDIA: pip install onnxruntime-gpu")
+    print("   - AMD (Windows): pip install onnxruntime-directml")
+    sys.exit(1)
 
+# Enable OpenCL for GPU-accelerated rendering if available
 if cv2.ocl.haveOpenCL():
     cv2.ocl.setUseOpenCL(True)
+    print("✅ OpenCV OpenCL enabled for GPU rendering")
 
 # =========================
-# CONFIG
+# PATHS FROM CONFIG
 # =========================
-VIDEO_DIR = "videos"
-MODELS_DIR = "models"
-RETINAFACE_PATH = "models/retinaface_r50.onnx"
-ARCFACE_PATH = "models/arcface_r100.onnx"
-# Default to new passport model
-EMBEDDINGS_PATH = "models/face_embeddings_passport_r100.pkl"
+VIDEO_DIR = config.VIDEO_DIR
+MODELS_DIR = config.MODELS_DIR
+RETINAFACE_PATH = config.RETINAFACE_PATH
+ARCFACE_PATH = config.ARCFACE_R100_PATH
 
 # =========================
 # MODEL CLASSES
@@ -161,29 +167,24 @@ known_embeddings = []
 known_names = []
 
 # Parse command-line arguments for model selection
-parser = argparse.ArgumentParser(description='Face Recognition with AMD GPU support')
-parser.add_argument('--model', type=int, default=4, choices=[1, 2, 3, 4],
+parser = argparse.ArgumentParser(description='Cross-Platform Face Recognition with GPU support')
+parser.add_argument('--model', type=int, default=config.DEFAULT_MODEL, choices=[1, 2, 3, 4],
                     help='Model selection: 1=Class Photos, 2=Passport Legacy, 3=Merged, 4=InsightFace SOTA (default: 4)')
 args = parser.parse_args()
 
-print("\n-----------------------------")
-print("Available Models:")
-print("1. Detection w/ Class Photos")
-print("2. Detection w/ Passport Photos (Legacy)")
-print("3. Detection w/ Merged Model")
-print("4. Detection w/ InsightFace Passport Model (SOTA)")
-print(f"Selected: Model {args.model}")
+print("\n" + "="*60)
+print("CROSS-PLATFORM FACE RECOGNITION SYSTEM")
+print("="*60)
+print(f"Platform: {config.PLATFORM}")
+print(f"\nAvailable Models:")
+for i in range(1, 5):
+    print(f"  {i}. {config.get_model_name(i)}")
+print(f"\nSelected: Model {args.model} - {config.get_model_name(args.model)}")
 
-if args.model == 2: 
-    EMBEDDINGS_PATH = "models/face_embeddings_passport.pkl"
-elif args.model == 3: 
-    EMBEDDINGS_PATH = "models/face_embeddings_merged.pkl"
-elif args.model == 1: 
-    EMBEDDINGS_PATH = "models/face_embeddings_arcface.pkl"
-else: 
-    EMBEDDINGS_PATH = "models/face_embeddings_passport_r100.pkl"
-
-print(f">> Using {EMBEDDINGS_PATH}\n")
+# Get embeddings path using config
+EMBEDDINGS_PATH = config.get_embeddings_path(args.model)
+print(f"Embeddings: {EMBEDDINGS_PATH}")
+print("="*60 + "\n")
 
 if os.path.exists(EMBEDDINGS_PATH):
     try:
@@ -304,13 +305,13 @@ def video_player():
     threading.Thread(target=recognizer_thread, daemon=True).start()
     
     # Create window with enhanced display settings
-    window_name = "InsightFace AMD (Fluid)"
+    window_name = f"Face Recognition ({config.PLATFORM})"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     try:
-        # Force window to stay on top and be visible
+        # Force window to stay on top and be visible (Windows only)
         cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
     except:
-        pass  # Some OpenCV builds don't support this
+        pass  # Some OpenCV builds/platforms don't support this
     
     print(f"\n{'='*50}")
     print(f"🎬 VIDEO PLAYER STARTED")
@@ -319,10 +320,18 @@ def video_player():
     print(f"{'='*50}\n")
     
     while running:
-        # scan for files
+        # Scan for video files using config
+        if not os.path.exists(VIDEO_DIR):
+            print(f"❌ Video directory not found: {VIDEO_DIR}")
+            print(f"   Creating directory...")
+            os.makedirs(VIDEO_DIR, exist_ok=True)
+            print(f"   Please add video files to {VIDEO_DIR}")
+            time.sleep(3)
+            continue
+            
         files = [f for f in os.listdir(VIDEO_DIR) 
-                 if f.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.wmv'))]
-        files.sort() # Play in order
+                 if f.lower().endswith(config.VIDEO_EXTENSIONS)]
+        files.sort()  # Play in order
         
         if not files:
             print("No videos found. Waiting...")

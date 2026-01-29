@@ -237,8 +237,8 @@ def recognizer_thread(recognizer, index, known_names, confidence_threshold):
 # =========================
 def main():
     parser = argparse.ArgumentParser(description='Test face detection and recognition models')
-    parser.add_argument('--model', type=int, default=5, choices=[1, 2, 3, 4, 5],
-                        help='Model: 1=Class, 2=Passport Legacy, 3=Merged, 4=Passport R100, 5=Merged R100 (default)')
+    parser.add_argument('--model', type=str, default=None,
+                        help='Model name or number to use (e.g., "merged_r100" or "1")')
     parser.add_argument('--no-recognition', action='store_true',
                         help='Skip face recognition, only do detection')
     parser.add_argument('--confidence', type=float, default=0.4,
@@ -255,18 +255,125 @@ def main():
     print("  FACE DETECTION & RECOGNITION MODEL TESTER")
     print("="*60)
     
-    # Select embeddings file
-    embeddings_options = {
-        1: "models/face_embeddings_arcface.pkl",
-        2: "models/face_embeddings_passport.pkl",
-        3: "models/face_embeddings_merged.pkl",
-        4: "models/face_embeddings_passport_r100.pkl",
-        5: "models/face_embeddings_merged_r100.pkl"  # NEW: Best model
-    }
+    # Dynamically discover all model files in models directory
+    models_dir = "models"
+    if not os.path.exists(models_dir):
+        print(f"\n[ERROR] Models directory not found: {models_dir}")
+        return
     
-    EMBEDDINGS_PATH = embeddings_options.get(args.model, embeddings_options[5])
-    print(f"\n📊 Model Selection: {args.model}")
-    print(f"📁 Embeddings: {EMBEDDINGS_PATH}")
+    # Find all .pkl files
+    model_files = [f for f in os.listdir(models_dir) if f.endswith('.pkl')]
+    
+    if not model_files:
+        print(f"\n[ERROR] No .pkl model files found in {models_dir}")
+        return
+    
+    # Load info about each model
+    available_models = []
+    for i, filename in enumerate(sorted(model_files), start=1):
+        model_path = os.path.join(models_dir, filename)
+        
+        # Extract display name from filename
+        display_name = filename.replace('face_embeddings_', '').replace('.pkl', '').replace('_', ' ').title()
+        
+        # Get file size
+        size_bytes = os.path.getsize(model_path)
+        size_kb = size_bytes / 1024
+        
+        # Try to load and get stats
+        num_embeddings = 0
+        num_students = 0
+        student_names = []
+        
+        try:
+            with open(model_path, 'rb') as f:
+                embeddings, names = pickle.load(f)
+            num_embeddings = len(embeddings)
+            num_students = len(set(names))
+            student_names = sorted(set(names))
+        except Exception as e:
+            # If can't load, just show file info
+            pass
+        
+        available_models.append({
+            'number': i,
+            'filename': filename,
+            'path': model_path,
+            'display_name': display_name,
+            'size_kb': size_kb,
+            'num_embeddings': num_embeddings,
+            'num_students': num_students,
+            'student_names': student_names
+        })
+    
+    # If no model specified, ask user interactively
+    selected_model = None
+    
+    if args.model is None:
+        print("\n" + "="*60)
+        print("  SELECT A MODEL")
+        print("="*60)
+        print(f"\nFound {len(available_models)} models in {models_dir}/\n")
+        
+        # Display all available models
+        for model in available_models:
+            print(f"  [{model['number']}] {model['display_name']}")
+            print(f"      File: {model['filename']}")
+            if model['num_students'] > 0:
+                print(f"      Stats: {model['num_students']} students, {model['num_embeddings']} embeddings, {model['size_kb']:.1f} KB")
+                if model['num_students'] <= 10:
+                    print(f"      Students: {', '.join(model['student_names'])}")
+            else:
+                print(f"      Size: {model['size_kb']:.1f} KB")
+            print()
+        
+        # Get user selection
+        while True:
+            try:
+                choice = input("Select model number (or 'q' to quit): ").strip()
+                if choice.lower() == 'q':
+                    print("\nExiting...")
+                    return
+                
+                model_num = int(choice)
+                if 1 <= model_num <= len(available_models):
+                    selected_model = available_models[model_num - 1]
+                    break
+                else:
+                    print(f"[ERROR] Invalid selection. Choose 1-{len(available_models)}")
+            except ValueError:
+                print("[ERROR] Please enter a number or 'q' to quit")
+            except KeyboardInterrupt:
+                print("\n\nExiting...")
+                return
+    else:
+        # User specified model via command line
+        # Try to match by number or by name
+        try:
+            model_num = int(args.model)
+            if 1 <= model_num <= len(available_models):
+                selected_model = available_models[model_num - 1]
+        except ValueError:
+            # Not a number, try to match by filename
+            search_term = args.model.lower()
+            for model in available_models:
+                if search_term in model['filename'].lower() or search_term in model['display_name'].lower():
+                    selected_model = model
+                    break
+        
+        if not selected_model:
+            print(f"\n[ERROR] Model not found: {args.model}")
+            print(f"Available models: {', '.join([m['filename'] for m in available_models])}")
+            return
+    
+    # Display selected model info
+    EMBEDDINGS_PATH = selected_model['path']
+    
+    print(f"\n[SELECTED MODEL]")
+    print(f"  Number: {selected_model['number']}")
+    print(f"  Name: {selected_model['display_name']}")
+    print(f"  File: {selected_model['filename']}")
+    print(f"  Path: {EMBEDDINGS_PATH}")
     
     # Load face embeddings database
     known_embeddings = []
@@ -284,14 +391,16 @@ def main():
                     faiss.normalize_L2(db_emb)
                     index = faiss.IndexFlatIP(dim)
                     index.add(db_emb)
-                    print(f"✅ Loaded {len(known_embeddings)} face embeddings")
-                    print(f"   Known people: {set(known_names)}")
+                    print(f"\n[OK] Loaded {len(known_embeddings)} face embeddings")
+                    print(f"     Unique students: {len(set(known_names))}")
+                    if len(set(known_names)) <= 30:
+                        print(f"     Students: {', '.join(sorted(set(known_names)))}")
                 else:
-                    print("⚠️  No embeddings found in file")
+                    print("\n[WARNING] No embeddings found in file")
             except Exception as e:
-                print(f"❌ Error loading embeddings: {e}")
+                print(f"\n[ERROR] Error loading embeddings: {e}")
         else:
-            print(f"⚠️  Embeddings file not found: {EMBEDDINGS_PATH}")
+            print(f"\n[WARNING] Embeddings file not found: {EMBEDDINGS_PATH}")
             print("   Running in detection-only mode")
     
     # Load models

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Train Face Recognition Model on Class Photos
 Uses RetinaFace (detection) + ArcFace R100 (recognition)
@@ -6,10 +7,19 @@ Processes subdirectory structure: students faces/<StudentName>/<photo>.jpg
 """
 
 import os
+import sys
 import cv2
 import numpy as np
 import pickle
 import onnxruntime as ort
+
+# Fix Windows console encoding
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+from datetime import datetime
 
 # =========================
 # CONFIG
@@ -18,7 +28,11 @@ DATASET_DIR = "students faces"
 MODELS_DIR = "models"
 RETINAFACE_PATH = "models/retinaface_r50.onnx"
 ARCFACE_PATH = "models/arcface_r100.onnx"
-OUTPUT_PATH = "models/face_embeddings_class_r100.pkl"
+
+# Generate timestamped filename
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+OUTPUT_PATH = f"models/face_embeddings_class_r100_{timestamp}.pkl"
+OUTPUT_PATH_LATEST = "models/face_embeddings_class_r100.pkl"  # Also save as latest
 
 # =========================
 # MODEL CLASSES
@@ -240,6 +254,10 @@ def train():
         with open(OUTPUT_PATH, 'wb') as f:
             pickle.dump((known_embeddings, known_names), f)
         
+        # Also save as "latest"
+        with open(OUTPUT_PATH_LATEST, 'wb') as f:
+            pickle.dump((known_embeddings, known_names), f)
+        
         print("\n" + "="*60)
         print("  TRAINING COMPLETE")
         print("="*60)
@@ -248,7 +266,9 @@ def train():
         print(f"⚠️  Failed: {total_failed}")
         print(f"✅ Unique students: {len(set(known_names))}")
         print(f"✅ Total embeddings: {len(known_embeddings)}")
-        print(f"📁 Saved to: {OUTPUT_PATH}")
+        print(f"📁 Saved:")
+        print(f"   - {OUTPUT_PATH} (timestamped)")  
+        print(f"   - {OUTPUT_PATH_LATEST} (latest)")
         print("="*60 + "\n")
     else:
         print("❌ No embeddings generated.")

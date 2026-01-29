@@ -1,0 +1,71 @@
+# ============================================================================
+# Face Recognition System - Requirements
+# ============================================================================
+# For cross-platform compatibility, install dependencies based on your system
+# and GPU configuration. See installation instructions below.
+
+# ----------------------------------------------------------------------------
+# CORE DEPENDENCIES (Required for all platforms)
+# ----------------------------------------------------------------------------
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# ----------------------------------------------------------------------------
+# ONNX RUNTIME - Choose ONE based on your hardware:
+# ----------------------------------------------------------------------------
+# Default: CPU only (works on all platforms)
+onnxruntime>=1.15.0
+
+# For NVIDIA GPU (Windows/Linux with CUDA):
+# onnxruntime-gpu>=1.15.0
+
+# For AMD GPU (Windows only, DirectML):
+# onnxruntime-directml>=1.15.0
+#
+# INSTALLATION:
+# - AMD GPU (Windows): pip install onnxruntime-directml
+# - NVIDIA GPU: pip install onnxruntime-gpu  
+# - CPU: pip install onnxruntime
+
+# ----------------------------------------------------------------------------
+# FACE RECOGNITION LIBRARIES
+# ----------------------------------------------------------------------------
+deepface>=0.0.79
+insightface>=0.7.3
+
+# TensorFlow (required for DeepFace)
+tf-keras>=2.15.0
+tensorflow>=2.15.0
+
+# ----------------------------------------------------------------------------
+# SIMILARITY SEARCH
+# ----------------------------------------------------------------------------
+faiss-cpu>=1.7.4
+# For NVIDIA GPU: use faiss-gpu instead of faiss-cpu
+
+# ----------------------------------------------------------------------------
+# OPTIONAL: Person Detection (YOLO)
+# ----------------------------------------------------------------------------
+# ultralytics>=8.0.0
+# torch>=2.0.0
+# torchvision>=0.15.0
+
+# ============================================================================
+# QUICK START
+# ============================================================================
+# 
+# 1. CPU Only:
+#    pip install -r requirements.txt
+#
+# 2. NVIDIA GPU:
+#    pip install -r requirements.txt onnxruntime-gpu torch torchvision
+#
+# 3. AMD GPU (Windows):
+#    pip install -r requirements.txt
+#    pip uninstall onnxruntime
+#    pip install onnxruntime-directml
+#
+# 4. Verify setup:
+#    python env_setup.py
+# ============================================================================

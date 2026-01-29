@@ -1,5 +1,11 @@
 # Face Recognition Model Notes
 
+## ✅ NAME VARIATION ISSUE - RESOLVED
+
+**All student names are now standardized!** The name duplication/variation issues (like "Gouripriya" vs "GOURIPRIYA") have been fixed in the training process.
+
+---
+
 ## Recognition Models Used by test_models.py
 
 ### Face Detection Model
@@ -19,10 +25,10 @@
 | Model # | Description | File | Embeddings |
 |---------|-------------|------|------------|
 | 1 | Class Photos | face_embeddings_arcface.pkl | 192 (class photos) |
-| 2 | Passport Legacy | face_embeddings_passport.pkl | 7 (passport) |
-| 3 | Merged Legacy | face_embeddings_merged.pkl | 199 (old merge) |
-| 4 | Passport R100 | face_embeddings_passport_r100.pkl | 7 (passport R100) |
-| 5 | Merged R100 ✨ | face_embeddings_merged_r100.pkl | 199 (20 students) DEFAULT |
+| 2 | Passport Legacy | face_embeddings_passport.pkl | Old |
+| 3 | Merged Legacy | face_embeddings_merged.pkl | Old |
+| 4 | Passport R100 | face_embeddings_passport_r100.pkl | 8 (passport R100) |
+| 5 | Merged R100 ✨ | face_embeddings_merged_r100.pkl | 200 (20 students) **DEFAULT** |
 
 ### GPU Acceleration
 - DirectML (AMD GPU) - automatically detected
@@ -45,24 +51,17 @@ python train_class_photos_r100.py
 ```powershell
 python train_passport_insightface.py
 ```
-**Output**: `models/face_embeddings_passport_r100.pkl` (7 embeddings)
+**Output**: `models/face_embeddings_passport_r100.pkl` (8 embeddings)
 
 #### 3. Merge Both Models
 ```powershell
 python merge_models_r100.py
 ```
-**Output**: `models/face_embeddings_merged_r100.pkl` (199 embeddings)
+**Outputs**:
+- `models/face_embeddings_merged_r100.pkl` (main file - 200 embeddings)
+- `models/face_embeddings_merged_r100_YYYYMMDD_HHMMSS.pkl` (timestamped backup)
 
-#### 4. Fix Name Variations (recommended)
-```powershell
-python fix_name_variations.py
-Move-Item -Force models/face_embeddings_merged_r100_fixed.pkl models/face_embeddings_merged_r100.pkl
-```
-
-Standardizes duplicate names:
-- "Gouripriya" + "GOURIPRIYA" → GOURIPRIYA
-- "Krishna S" + "KRISHNA S" → KRISHNA S
-- etc.
+The merge script now automatically creates timestamped backups, preserving all previous versions!
 
 ### What merge_models_r100.py Does
 
@@ -74,11 +73,12 @@ passport_emb, passport_names = pickle.load(open('models/face_embeddings_passport
 class_emb, class_names = pickle.load(open('models/face_embeddings_class_r100.pkl', 'rb'))
 
 # 3. Combine them
-all_embeddings = passport_emb + class_emb  # 7 + 192 = 199
+all_embeddings = passport_emb + class_emb  # 8 + 192 = 200
 all_names = passport_names + class_names
 
-# 4. Save merged model
+# 4. Save merged model (both main file and timestamped backup)
 pickle.dump((all_embeddings, all_names), open('models/face_embeddings_merged_r100.pkl', 'wb'))
+pickle.dump((all_embeddings, all_names), open(f'models/face_embeddings_merged_r100_{timestamp}.pkl', 'wb'))
 ```
 
 ### Quick One-Command Rebuild
@@ -86,19 +86,20 @@ pickle.dump((all_embeddings, all_names), open('models/face_embeddings_merged_r10
 ```powershell
 # Full rebuild from scratch
 python train_class_photos_r100.py
+python train_passport_insightface.py
 python merge_models_r100.py
-python fix_name_variations.py
-Move-Item -Force models/face_embeddings_merged_r100_fixed.pkl models/face_embeddings_merged_r100.pkl
 
-# Test
+# Test with merged model
 python test_models.py --model 5
 ```
+
+**Note**: The merge script automatically creates timestamped backups, so you'll have a history of all merges.
 
 ### Required Files
 
 **Input datasets:**
 - `students faces/` - Class photos (192 photos, 20 students)
-- `student faces paasport/` - Passport photos (7 photos)
+- `student faces paasport/` - Passport photos (8 photos)
 
 **ONNX models:**
 - `models/retinaface_r50.onnx` - Face detection
@@ -107,11 +108,10 @@ python test_models.py --model 5
 **Scripts:**
 - `train_class_photos_r100.py` - Trains on class photos
 - `train_passport_insightface.py` - Trains on passport photos
-- `merge_models_r100.py` - Merges the two
-- `fix_name_variations.py` - Standardizes names
+- `merge_models_r100.py` - Merges the two + creates timestamped backups
 
 **Final output:**
-- `models/face_embeddings_merged_r100.pkl` - 199 embeddings, 20 unique students
+- `models/face_embeddings_merged_r100.pkl` - 200 embeddings, 20 unique students
 
 ---
 
@@ -130,3 +130,19 @@ python test_models.py --model 5 --confidence 0.3
 # Multithreaded version (smoother playback)
 python test_models_mt.py --confidence 0.3
 ```
+
+---
+
+## Cross-Platform Compatibility (NEW!)
+
+All scripts now work on any computer! The system automatically detects:
+- **GPU**: NVIDIA CUDA, AMD DirectML, or CPU fallback
+- **Platform**: Windows, Linux, macOS
+- **Virtual Environment**: Auto-finds venv location
+
+### Utility Scripts
+- `python env_setup.py` - Verify your environment
+- `python gpu_utils.py` - Check GPU detection
+- `python launch_training_gui.py` - Cross-platform GUI launcher
+
+See `README.md` for complete setup instructions.
